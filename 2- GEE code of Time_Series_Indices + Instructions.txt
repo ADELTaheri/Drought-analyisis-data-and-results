@@ -1,0 +1,208 @@
+///This code generates the time series indices used for calculation of SDCI. To Cusotumize it and make your own map, follow the instruction below:
+///////1. Copy the code
+///////2. Go to Assets tab on the GEE and import your own shape file and rename it to "country".
+///////3. To costumize the time, modify the time in line 5 and 6. Not thet the format it " YYYY-mm-dd ".
+///////4. Important notice about changin the time: If the interested time is beyond September 2021, follow the instrcution provided in line 
+
+///// To copy the code, you should copy the link below and paste it in a Browser subscribed to your Earth Engine account.
+////https://code.earthengine.google.com/860791fa32a247b930d18bf7be77c36e
+//////Or copy the following lines and paste it in your EE acount
+
+var highlight_Shape = highlighted_code.filter(ee.Filter.eq('ADM0_CODE',117));
+Map.addLayer(highlight_Shape,['green'],'iran');
+var StartDate = '2019-01-01';
+var EndDate = '2021-09-01';
+
+////////////////////////////////////
+/////////////////TCI////////////////
+///////////////////////////////////
+var lst_modis = ee.ImageCollection("MODIS/006/MOD11A2")
+.filterBounds(country)
+.filterDate(StartDate,EndDate)
+.select('LST_Day_1km')
+.map(function(image){
+  
+  return image.multiply(0.02)
+  .copyProperties(image,['system:time_start','system:time_end'])
+});
+ 
+print(lst_modis,'LST')
+// Map.addLayer(lst_modis, {}, 'lst', false);
+var TCI = lst_modis.map(function(image){
+  
+  var min = image.reduceRegion(ee.Reducer.min(),country,1000).get('LST_Day_1km');
+  var max = image.reduceRegion(ee.Reducer.max(),country,1000).get('LST_Day_1km');
+  
+  var tci_index = image.expression(
+    '(max - lst)/(max - min)',{
+      'max': ee.Number(max),
+      'min': ee.Number(min),
+      'lst': image
+    }).rename('TCI');
+    
+  return   tci_index.copyProperties(image,['system:time_start','system:time_end']);
+
+});
+print(TCI,'TCI')
+// Map.addLayer(TCI, {}, 'TCI', false);
+//ndvi and lst
+//Map.addLayer(ndvi, {}, 'ndvi', false);
+//Map.addLayer(lst, {}, 'lst', true);
+Map.setCenter(54,30,4);
+Map.setOptions('Satellite') 
+//Create User Interface portion --------------------------------------------------
+//Create a panel to hold our widgets.
+var panel = ui.Panel();
+panel.style().set('width', '500px');
+
+// Create an intro panel with labels.
+var intro = ui.Panel([
+  ui.Label({
+    value: 'Drought Analysis Panel',
+    style: {fontSize: '20px', fontWeight: 'bold'}
+  }),
+  ui.Label('Click a point on the highlighted area (IRAN) to inspect Temperture Condition Index (TCI), Vegetation Condition Index (VCI), & Precipitation condition Index (PCI) from January 2016 to December 2018. It may take a few minutes for generating charts.'),
+    ui.Label({
+    value: ' To explore the drought indices for different area and time, follow the instructions on https://github.com/ADELTaheri/Drought-analyisis-data-and-results .',
+    style: {fontSize: '15px'}
+  })
+]);
+panel.add(intro);
+
+//panels to hold lon/lat values
+// var lon = ui.Label();
+// var lat = ui.Label();
+// panel.add(ui.Panel([lon, lat], ui.Panel.Layout.flow('horizontal')));
+
+// Register a callback on the default map to be invoked when the map is clicked
+Map.onClick(function(coords) {
+  // Update the lon/lat panel with values from the click event.
+  var lon = ui.Label();
+  var lat = ui.Label();
+  panel.add(ui.Panel([lon, lat], ui.Panel.Layout.flow('vertical')));
+  lon.setValue('lon: ' + coords.lon.toFixed(2)),
+  lat.setValue('lat: ' + coords.lat.toFixed(2));
+   var point = ee.Geometry.Point(coords.lon, coords.lat);
+    //panel.widgets().set(1, PCI_value);
+  // Create an TCI chart.
+  var TCI_value = ui.Chart.image.series(TCI, point, ee.Reducer.mean(), 250);
+  TCI_value.setOptions({
+    title: 'TCI',
+    vAxis: {title: 'TCI Value', maxValue: 1},
+    hAxis: {title: 'date', format: 'MM-yy', gridlines: {count: 7}},
+    colors: ['e37d05', '1d6b99'],
+  });
+  panel.widgets().set(2, TCI_value);
+
+//   // Create a VCI chart.
+  var collectionModNDVI = ee.ImageCollection('MODIS/006/MOD13Q1')
+    .filterBounds(country)
+    .filterDate(StartDate,EndDate)
+    .select('NDVI')
+    .map(function(image){
+  
+  return image.multiply(0.0001)
+  .copyProperties(image,['system:time_start','system:time_end'])
+});
+print(collectionModNDVI,'NDVI')
+/////////VCI calculation////////
+var VCI = collectionModNDVI.map(function(image){
+  var min = image.reduceRegion({
+    reducer: ee.Reducer.min(),
+    geometry: regions,
+    scale: 30,
+    maxPixels: 1e20
+    }).get('NDVI');
+    var max = image.reduceRegion({
+    reducer: ee.Reducer.max(),
+    geometry: regions,
+    scale: 30,
+    maxPixels: 1e20
+    }).get('NDVI');
+  
+  var vci_index = image.expression(
+    '(ndvi - min)/(max - min)',{
+      'min':ee.Number(min),
+      'max':ee.Number(max),
+      'ndvi': image
+    }).rename('VCI');
+    
+  return vci_index.copyProperties(image,['system:time_start','system:time_end'])
+  
+});
+
+
+print(VCI,'vci')
+  //var vcitimeseries = ui.Chart.image.seriesByRegion(VCI, regions, ee.Reducer.mean(), 'VCI', 1000, 'system:time_start', 'label')
+  //.setOptions({
+  var VCI_value = ui.Chart.image.series(VCI, point, ee.Reducer.mean(), 250);
+  VCI_value.setOptions({
+    title: 'VCI',
+    vAxis: {title: 'VCI Value', maxValue: 1},
+    hAxis: {title: 'date', format: 'MM-yy', gridlines: {count: 7}},
+    colors: ['1a9850'],
+  });
+  panel.widgets().set(3, VCI_value);
+
+
+//     // Create a PCI chart.
+
+  var TRMM2 = ee.ImageCollection("NASA/GPM_L3/IMERG_MONTHLY_V06") /// Please note that for  that for the times after September 2021, use "NASA/GPM_L3/IMERG_V06" instead.
+  .filterBounds(country)
+  .filterDate(StartDate,EndDate)
+  .select('precipitation')
+// var PCI = TRMM2.map(function(image){
+//   var clip = image.clip(regions);
+  // .map(function(image){
+  print(TRMM2,'CHIRPS')
+  // return image.multiply(0.0001)
+  // .copyProperties(image,['system:time_start','system:time_end'])
+// });
+//print(TRMM2,'rainfall')
+// /////////PCI calculation////////
+var PCI = TRMM2.map(function(image){
+  var min = image.reduceRegion({
+    reducer: ee.Reducer.min(),
+    geometry: regions,
+    scale: 30,
+    maxPixels: 1e20
+    }).get('precipitation');
+  var max = image.reduceRegion({
+    reducer: ee.Reducer.max(),
+    geometry: regions,
+    scale: 30,
+    maxPixels: 1e20
+    }).get('precipitation');
+  
+  var pci = image.expression(
+    '(trmm - min)/(max - min)',{
+      'trmm':image,
+      'min':ee.Number(min),
+      'max':ee.Number(max)
+    }).rename('PCI');
+    
+  return pci.copyProperties(image,['system:time_start','system:time_end'])
+  
+});
+
+
+print(PCI,'pci')
+  //var vcitimeseries = ui.Chart.image.seriesByRegion(VCI, regions, ee.Reducer.mean(), 'VCI', 1000, 'system:time_start', 'label')
+  //.setOptions({
+  var PCI_value = ui.Chart.image.series(PCI, point, ee.Reducer.mean(), 250);
+  PCI_value.setOptions({
+//   var PCI_value = ui.Chart.image.seriesByRegion(PCI, regions, ee.Reducer.mean(), 'PCI', 20000, 'system:time_start', 'label')
+// .setOptions({
+    title: 'PCI',
+    vAxis: {title: 'PCI Value',minValue:0, maxValue: 1},
+    hAxis: {title: 'date', format: 'MM-yy', gridlines: {count: 7}},
+   
+  });
+  panel.widgets().set(4, PCI_value);
+  
+ });
+
+Map.style().set('cursor', 'crosshair');
+
+// Add the panel to the ui.root.
+ui.root.insert(0, panel);
