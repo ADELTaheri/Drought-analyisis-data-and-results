@@ -1,0 +1,9 @@
+//////In order to view or interact with the results, just copy and paste the links below. You do not need any GEE acoount.
+
+1. Code for yearly average SDCI of Iran:
+ 
+   https://adeltaheripolimi.users.earthengine.app/view/yearlyaveragesdci
+
+2. The code for drought indices time series:
+
+   https://adeltaheripolimi.users.earthengine.app/view/temporalanalysisof-drought
