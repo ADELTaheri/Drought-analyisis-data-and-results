@@ -1,12 +1,13 @@
 ///This code generates the time series indices used for calculation of SDCI. To Cusotumize it and make your own map, follow the instruction below:
-///////1. Copy the code
+///////1. Copy the code below and paste it to your GEE acount.
 ///////2. Go to Assets tab on the GEE and import your own shape file and rename it to "country".
-///////3. To costumize the time, modify the time in line 13 and 14 (start and end dat). Please note thet the format is " YYYY-mm-dd ".
-///////4. Important notice about changin the time: If the interested time is beyond September 2021, follow the instrcution provided in line 150.
+///////3. To highlight your area of interest, find the code of your country from https://www.fao.org/nocs/en/, clicking on the country and use the GAUL Country Code instead of "117" in line 12. 
+///////3. To costumize the time, modify the time in line 14 and 15 (start and end dat). Please note thet the format is " YYYY-mm-dd ".
+///////4. Important notice about changing the time: If the interested time is after September 2021, follow the instrcution provided in line 151.
 
 ///// To copy the code, you should copy the link below and paste it in a Browser subscribed to your Earth Engine account.
 ////https://code.earthengine.google.com/860791fa32a247b930d18bf7be77c36e
-//////Or copy the following lines and paste it in your EE acount
+//////Or copy the following lines (from line 12 on) and paste it in your EE acount
 
 var highlight_Shape = highlighted_code.filter(ee.Filter.eq('ADM0_CODE',117));
 Map.addLayer(highlight_Shape,['green'],'iran');
