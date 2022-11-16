@@ -1,8 +1,8 @@
 ///This code generates the time series indices used for calculation of SDCI. To Cusotumize it and make your own map, follow the instruction below:
 ///////1. Copy the code
 ///////2. Go to Assets tab on the GEE and import your own shape file and rename it to "country".
-///////3. To costumize the time, modify the time in line 5 and 6. Not thet the format it " YYYY-mm-dd ".
-///////4. Important notice about changin the time: If the interested time is beyond September 2021, follow the instrcution provided in line 
+///////3. To costumize the time, modify the time in line 13 and 14 (start and end dat). Please note thet the format is " YYYY-mm-dd ".
+///////4. Important notice about changin the time: If the interested time is beyond September 2021, follow the instrcution provided in line 150.
 
 ///// To copy the code, you should copy the link below and paste it in a Browser subscribed to your Earth Engine account.
 ////https://code.earthengine.google.com/860791fa32a247b930d18bf7be77c36e
