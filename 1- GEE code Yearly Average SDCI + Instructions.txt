@@ -1,10 +1,10 @@
 /////This code provides the yearly average SDCI for Iran from 2010 to 2022. To Cusotumize it and make your own map, follow the instruction below:
-///////1. Copy the code
-///////2. Go to Assets tab on the GEE and import your own shape file.
+///////1. Copy and paste the code to your GEE account 
+///////2. Go to Assets tab on the GEE and import your own shape file and rename it to "table".
 
 ///// To copy the code, you should copy the link below and paste it in a Browser subscribed to your Earth Engine account.
 ////https://code.earthengine.google.com/a99e74b57f8dccd91df9db7c47978d40
-//////Or copy the following lines and paste it in your EE acount
+//////Or create a GEE blank tab and copy the following lines (From line 9 on) and paste it to that blank GEE file.
 
 // Function to reques the data collection
 var roi = ee.Geometry.BBox(-90.496353, 34.851971, -90.495749, 34.852197);
