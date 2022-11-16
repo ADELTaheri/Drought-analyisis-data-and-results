@@ -1,0 +1,610 @@
+/////This code provides the yearly average SDCI for Iran from 2010 to 2022. To Cusotumize it and make your own map, follow the instruction below:
+///////1. Copy the code
+///////2. Go to Assets tab on the GEE and import your own shape file.
+
+///// To copy the code, you should copy the link below and paste it in a Browser subscribed to your Earth Engine account.
+////https://code.earthengine.google.com/a99e74b57f8dccd91df9db7c47978d40
+//////Or copy the following lines and paste it in your EE acount
+
+// Function to reques the data collection
+var roi = ee.Geometry.BBox(-90.496353, 34.851971, -90.495749, 34.852197);
+Map.setCenter(57,30,4);
+Map.setOptions('Satellite') 
+Map.style().set('cursor', 'crosshair');
+function getMap(start_date,end_date, table) {
+  var lst_modis = ee.ImageCollection("MODIS/006/MOD11A2") 
+  .filterBounds(table)
+  .filterDate(start_date,end_date)
+  .select('LST_Day_1km')
+  .mean()
+  .multiply(0.02)
+  .clip(table);
+  // print (lst_modis);
+  var min = lst_modis.reduceRegion(ee.Reducer.min(),table,1000).get('LST_Day_1km');
+  var max = lst_modis.reduceRegion(ee.Reducer.max(),table,1000).get('LST_Day_1km');
+  
+  var tci_index = lst_modis.expression(
+      '(max - lst)/(max - min)',{
+        'max': ee.Number(max),
+        'min': ee.Number(min),
+        'lst': lst_modis
+      }).rename('TCI');
+      
+  var colorizedVis = {
+    min: 0.0,
+    max: 1.0,
+    palette: [
+      'FFFFFF', 'CE7E45', 'DF923D', 'F1B555', 'FCD163', '99B718', '74A901',
+      '66A000', '529400', '3E8601', '207401', '056201', '004C00', '023B01',
+      '012E01', '011D01', '011301'
+    ],
+  };   
+       
+  //VCI
+  
+  var ndvi_modis = ee.ImageCollection("MODIS/006/MOD13Q1")
+  .filterBounds(table)
+  .filterDate(start_date,end_date)
+  .select('NDVI')
+  .mean()
+  .multiply(0.0001)
+  .clip(table);
+  
+    
+    var min = ndvi_modis.reduceRegion(ee.Reducer.min(),table,1000).get('NDVI');
+    var max = ndvi_modis.reduceRegion(ee.Reducer.max(),table,1000).get('NDVI');
+    
+    var vci_index = ndvi_modis.expression(
+      '(ndvi - min)/(max - min)',{
+        'min':ee.Number(min),
+        'max':ee.Number(max),
+        'ndvi': ndvi_modis
+      }).rename('VCI');
+  
+  //PCI
+  
+  var TRMM2 =  ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY") 
+  .filterBounds(table)
+  .filterDate(start_date,end_date)
+  .select('precipitation')
+  .mean()
+  .clip(table);
+   var min = TRMM2.reduceRegion(ee.Reducer.min(),table,6500).get('precipitation');
+    var max = TRMM2.reduceRegion(ee.Reducer.max(),table,6500).get('precipitation');
+    var pci = TRMM2.expression(
+      '(trmm - min)/(max - min)',{
+        'trmm':TRMM2,
+        'min':ee.Number(min),
+        'max':ee.Number(max)
+      }).rename('PCI');
+  
+  
+  // SDCI////////////////////
+  
+  var dataset = ee.Image.cat(tci_index,vci_index,pci);
+  //print(dataset,'dataset');
+  
+  var SDCI = dataset.expression('0.5 * pci + 0.25 * vci_index + 0.25 * tci_index',{
+    'pci':dataset.select('PCI'),
+    'vci_index':dataset.select('VCI'),
+    'tci_index':dataset.select('TCI'),
+  });
+  
+  ////classification
+  var SDCI1 = SDCI.where(SDCI.lt(0.1),1);
+  var SDCI2 = SDCI1.where(SDCI.gte(0.1).and(SDCI.lt(0.2)),2);
+  var SDCI3 = SDCI2.where(SDCI.gte(0.2).and(SDCI.lt(0.3)),3);
+  var SDCI4 = SDCI3.where(SDCI.gte(0.3).and(SDCI.lt(0.4)),4);
+  var SDCI5 = SDCI4.where(SDCI.gte(0.4).and(SDCI.lt(1.0)),5);
+  
+  ////set map options
+  //Map.setCenter(57,30,4);
+  // Map.setOptions('Satellite') 
+  //Map.style().set('cursor', 'crosshair');
+  //// Yearly SDCI
+  var viridis = {min: 0 , max : 6,palette : ['#a50026','#f46d43', '#ffffbf','#30eb5b', '#387242']};
+  var SDCImap = ui.Map.Layer(SDCI5, viridis,'SDCI',true)
+  Map.add(SDCImap)
+  return SDCI
+  
+}
+
+function isChecked(date, dict_dates) {
+  for (var val in dict_dates) {
+    if (val == date) {
+      dict_dates[val]['isChecked'] = true;
+    } else {
+      dict_dates[val]['isChecked'] = false
+      dict_dates[val]['checkBox'].setValue(false)
+    }
+  }
+}
+
+// Define a UI widget and add it to the map.
+var dict_dates = {
+    '2010': {
+    'start_date':'2010-01-01',
+    'end_date':'2010-12-31',
+    'isChecked': false
+  },
+    '2011': {
+    'start_date':'2011-01-01',
+    'end_date':'2011-12-31',
+    'isChecked': false
+  },
+      '2012': {
+    'start_date':'2012-01-01',
+    'end_date':'2012-12-31',
+    'isChecked': false
+  },
+    '2013': {
+    'start_date':'2013-01-01',
+    'end_date':'2013-12-31',
+    'isChecked': false
+  },
+    '2014': {
+    'start_date':'2014-01-01',
+    'end_date':'2014-12-31',
+    'isChecked': false
+  },
+      '2015': {
+    'start_date':'2015-01-01',
+    'end_date':'2015-12-31',
+    'isChecked': false
+  },
+       '2016': {
+    'start_date':'2016-01-01',
+    'end_date':'2016-12-31',
+    'isChecked': false
+  },
+       '2017': {
+    'start_date':'2017-01-01',
+    'end_date':'2017-12-31',
+    'isChecked': false
+  },
+      '2018': {
+    'start_date':'2018-01-01',
+    'end_date':'2018-12-31',
+    'isChecked': false
+  },
+  '2019': {
+    'start_date':'2019-01-01',
+    'end_date':'2019-12-31',
+    'isChecked': false
+  },
+  '2020': {
+    'start_date':'2020-01-01',
+    'end_date':'2020-12-31',
+    'isChecked': false
+  },
+  '2021': {
+    'start_date':'2021-01-01',
+    'end_date':'2021-12-31',
+    'isChecked': false
+  },
+  '2022': {
+    'start_date':'2022-01-01',
+    'end_date':'2022-12-31',
+    'isChecked': false
+  }
+
+} 
+var checkBox_1 = ui.Checkbox({label: '2010', value:false, style: {width: '200px'}});
+dict_dates['2010']['checkBox'] = checkBox_1
+var checkBox_2 = ui.Checkbox({label: '2011', value:false, style: {width: '200px'}});
+dict_dates['2011']['checkBox'] = checkBox_2
+var checkBox_3 = ui.Checkbox({label: '2012', value:false, style: {width: '200px'}});
+dict_dates['2012']['checkBox'] = checkBox_3
+var checkBox_4 = ui.Checkbox({label: '2013', value:false, style: {width: '200px'}});
+dict_dates['2013']['checkBox'] = checkBox_4
+var checkBox_5 = ui.Checkbox({label: '2014', value:false, style: {width: '200px'}});
+dict_dates['2014']['checkBox'] = checkBox_5
+var checkBox_6 = ui.Checkbox({label: '2015', value:false, style: {width: '200px'}});
+dict_dates['2015']['checkBox'] = checkBox_6
+var checkBox_7 = ui.Checkbox({label: '2016', value:false, style: {width: '200px'}});
+dict_dates['2016']['checkBox'] = checkBox_7
+var checkBox_8 = ui.Checkbox({label: '2017', value:false, style: {width: '200px'}});
+dict_dates['2017']['checkBox'] = checkBox_8
+var checkBox_9 = ui.Checkbox({label: '2018', value:false, style: {width: '200px'}});
+dict_dates['2018']['checkBox'] = checkBox_9
+var checkBox_10 = ui.Checkbox({label: '2019', value:false, style: {width: '200px'}});
+dict_dates['2019']['checkBox'] = checkBox_10
+var checkBox_11 = ui.Checkbox({label: '2020', value:false, style: {width: '200px'}});
+dict_dates['2020']['checkBox'] = checkBox_11
+var checkBox_12 = ui.Checkbox({label: '2021', value:false, style: {width: '200px'}});
+dict_dates['2021']['checkBox'] = checkBox_12
+var checkBox_13 = ui.Checkbox({label: '2022', value:false, style: {width: '200px'}});
+dict_dates['2022']['checkBox'] = checkBox_13
+
+checkBox_1.onChange(
+  (function(checked) {
+      if (checked) {
+        if (Map.layers().length()>0){
+          var layers = Map.layers()
+          Map.remove(layers.get(0))
+        }
+        var start_date = dict_dates[checkBox_1.getLabel()]['start_date']
+        var end_date = dict_dates[checkBox_1.getLabel()]['end_date']
+        isChecked(checkBox_1.getLabel(), dict_dates)
+        var sdci_index = getMap(start_date, end_date,table)
+        clickMap(sdci_index)
+    }
+  })
+)
+
+checkBox_2.onChange(
+  (function(checked) {
+      if (checked) {
+        if (Map.layers().length()>0){
+          var layers = Map.layers()
+          Map.remove(layers.get(0))
+        }
+        var start_date = dict_dates[checkBox_2.getLabel()]['start_date']
+        var end_date = dict_dates[checkBox_2.getLabel()]['end_date']
+        isChecked(checkBox_2.getLabel(), dict_dates)
+        var sdci_index = getMap(start_date, end_date,table)
+        clickMap(sdci_index)
+    }
+  })
+)
+
+checkBox_3.onChange(
+  (function(checked) {
+      if (checked) {
+        if (Map.layers().length()>0){
+          var layers = Map.layers()
+          Map.remove(layers.get(0))
+        }
+        var start_date = dict_dates[checkBox_3.getLabel()]['start_date']
+        var end_date = dict_dates[checkBox_3.getLabel()]['end_date']
+        isChecked(checkBox_3.getLabel(), dict_dates)
+        var sdci_index = getMap(start_date, end_date,table)
+        clickMap(sdci_index)
+    }
+  })
+)
+
+checkBox_4.onChange(
+  (function(checked) {
+      if (checked) {
+        if (Map.layers().length()>0){
+          var layers = Map.layers()
+          Map.remove(layers.get(0))
+        }
+        var start_date = dict_dates[checkBox_4.getLabel()]['start_date']
+        var end_date = dict_dates[checkBox_4.getLabel()]['end_date']
+        isChecked(checkBox_4.getLabel(), dict_dates)
+        var sdci_index = getMap(start_date, end_date,table)
+        clickMap(sdci_index)
+    }
+  })
+)
+checkBox_5.onChange(
+  (function(checked) {
+      if (checked) {
+        if (Map.layers().length()>0){
+          var layers = Map.layers()
+          Map.remove(layers.get(0))
+        }
+        var start_date = dict_dates[checkBox_5.getLabel()]['start_date']
+        var end_date = dict_dates[checkBox_5.getLabel()]['end_date']
+        isChecked(checkBox_5.getLabel(), dict_dates)
+        var sdci_index = getMap(start_date, end_date,table)
+        clickMap(sdci_index)
+    }
+  })
+)
+checkBox_6.onChange(
+  (function(checked) {
+      if (checked) {
+        if (Map.layers().length()>0){
+          var layers = Map.layers()
+          Map.remove(layers.get(0))
+        }
+        var start_date = dict_dates[checkBox_6.getLabel()]['start_date']
+        var end_date = dict_dates[checkBox_6.getLabel()]['end_date']
+        isChecked(checkBox_6.getLabel(), dict_dates)
+        var sdci_index = getMap(start_date, end_date,table)
+        clickMap(sdci_index)
+    }
+  })
+)
+checkBox_7.onChange(
+  (function(checked) {
+      if (checked) {
+        if (Map.layers().length()>0){
+          var layers = Map.layers()
+          Map.remove(layers.get(0))
+        }
+        var start_date = dict_dates[checkBox_7.getLabel()]['start_date']
+        var end_date = dict_dates[checkBox_7.getLabel()]['end_date']
+        isChecked(checkBox_7.getLabel(), dict_dates)
+        var sdci_index = getMap(start_date, end_date,table)
+        clickMap(sdci_index)
+    }
+  })
+)
+checkBox_8.onChange(
+  (function(checked) {
+      if (checked) {
+        if (Map.layers().length()>0){
+          var layers = Map.layers()
+          Map.remove(layers.get(0))
+        }
+        var start_date = dict_dates[checkBox_8.getLabel()]['start_date']
+        var end_date = dict_dates[checkBox_8.getLabel()]['end_date']
+        isChecked(checkBox_8.getLabel(), dict_dates)
+        var sdci_index = getMap(start_date, end_date,table)
+        clickMap(sdci_index)
+    }
+  })
+)
+checkBox_9.onChange(
+  (function(checked) {
+      if (checked) {
+        if (Map.layers().length()>0){
+          var layers = Map.layers()
+          Map.remove(layers.get(0))
+        }
+        var start_date = dict_dates[checkBox_9.getLabel()]['start_date']
+        var end_date = dict_dates[checkBox_9.getLabel()]['end_date']
+        isChecked(checkBox_9.getLabel(), dict_dates)
+        var sdci_index = getMap(start_date, end_date,table)
+        clickMap(sdci_index)
+    }
+  })
+)
+checkBox_9.onChange(
+  (function(checked) {
+      if (checked) {
+        if (Map.layers().length()>0){
+          var layers = Map.layers()
+          Map.remove(layers.get(0))
+        }
+        var start_date = dict_dates[checkBox_9.getLabel()]['start_date']
+        var end_date = dict_dates[checkBox_9.getLabel()]['end_date']
+        isChecked(checkBox_9.getLabel(), dict_dates)
+        var sdci_index = getMap(start_date, end_date,table)
+        clickMap(sdci_index)
+    }
+  })
+)
+checkBox_10.onChange(
+  (function(checked) {
+      if (checked) {
+        if (Map.layers().length()>0){
+          var layers = Map.layers()
+          Map.remove(layers.get(0))
+        }
+        var start_date = dict_dates[checkBox_10.getLabel()]['start_date']
+        var end_date = dict_dates[checkBox_10.getLabel()]['end_date']
+        isChecked(checkBox_10.getLabel(), dict_dates)
+        var sdci_index = getMap(start_date, end_date,table)
+        clickMap(sdci_index)
+    }
+  })
+)
+checkBox_11.onChange(
+  (function(checked) {
+      if (checked) {
+        if (Map.layers().length()>0){
+          var layers = Map.layers()
+          Map.remove(layers.get(0))
+        }
+        var start_date = dict_dates[checkBox_11.getLabel()]['start_date']
+        var end_date = dict_dates[checkBox_11.getLabel()]['end_date']
+        isChecked(checkBox_11.getLabel(), dict_dates)
+        var sdci_index = getMap(start_date, end_date,table)
+        clickMap(sdci_index)
+    }
+  })
+)
+checkBox_12.onChange(
+  (function(checked) {
+      if (checked) {
+        if (Map.layers().length()>0){
+          var layers = Map.layers()
+          Map.remove(layers.get(0))
+        }
+        var start_date = dict_dates[checkBox_12.getLabel()]['start_date']
+        var end_date = dict_dates[checkBox_12.getLabel()]['end_date']
+        isChecked(checkBox_12.getLabel(), dict_dates)
+        var sdci_index = getMap(start_date, end_date,table)
+        clickMap(sdci_index)
+    }
+  })
+)
+checkBox_13.onChange(
+  (function(checked) {
+      if (checked) {
+        if (Map.layers().length()>0){
+          var layers = Map.layers()
+          Map.remove(layers.get(0))
+        }
+        var start_date = dict_dates[checkBox_13.getLabel()]['start_date']
+        var end_date = dict_dates[checkBox_13.getLabel()]['end_date']
+        isChecked(checkBox_13.getLabel(), dict_dates)
+        var sdci_index = getMap(start_date, end_date,table)
+        clickMap(sdci_index)
+    }
+  })
+)
+
+
+/////Adding panels
+var header = ui.Label('Scaled Drought Condition Index (SDCI)', {fontSize: '15px', fontWeight: 'bold', color: '4A997E'});
+
+//4.1) Create a new label for this series of checkboxes
+
+// var extLabel = ui.Label({value:'Choose a year',
+// style: {fontWeight: 'bold', fontSize: '16px', margin: '10px 5px'}
+// });
+
+
+//App summary
+var text = ui.Label(
+  ' The spatial distribution of drought in Iran from 2010 to 2022 evaluated by SDCI is presented and described here. ' +
+  'Click on each box to view the map of that year, then click on the map to get the yearly average SDCI for any geographical location in Iran. It may take a few seconds for map to appear.'  + 
+  'To explore SDCI for a different area or for a different time, follow the instructions on https://github.com/ADELTaheri/Drought-analyisis-data-and-results .',
+    {fontSize: '15px'});
+
+var panel = ui.Panel({
+  widgets:[header, text],//Adds header and text
+  style:{width: '300px',position:'top-left'}});
+  var intro = ui.Panel([
+  ui.Label({
+    value: '____________________________________________',
+    style: {fontWeight: 'bold',  color: '4A997E'},
+  }),
+  ui.Label({
+    value:'Drought condition according to SDCI [Rhee et al., 2010]',
+    style: {fontSize: '15px', fontWeight: 'bold'}
+  }),
+    ui.Label({
+    value:'SDCI<0.1 ===> Extreme drought',
+    style: {fontSize: '10px'}
+    }),
+    ui.Label({
+    value:'0.1<= SDCI <0.2 ===> Severe drought',
+    style: {fontSize: '10px'}
+  }),
+      ui.Label({
+    value:'0.2<= SDCI <0.3 ===> Moderate drought',
+    style: {fontSize: '10px'}
+  }),
+        ui.Label({
+    value:'0.3<= SDCI <0.4 ===> Light drought',
+    style: {fontSize: '10px'}
+  }),
+        ui.Label({
+    value:'SDCI>0.4 ===> Moderate drought',
+    style: {fontSize: '10px'}
+  })
+  ]);
+var title = ui.Label({
+  value: 'Classification',
+  style: {
+    fontSize: '14px',
+    fontWeight: 'bold',
+    margin: '0px;'
+  }
+})
+//Add this new panel to the larger panel we created 
+ panel.add(checkBox_1)
+      .add(checkBox_2)
+      .add(checkBox_3)
+      .add(checkBox_4)
+      .add(checkBox_5)
+      .add(checkBox_6)
+      .add(checkBox_7)
+      .add(checkBox_8)
+      .add(checkBox_9)
+      .add(checkBox_10)
+      .add(checkBox_11)
+      .add(checkBox_12)
+      .add(checkBox_13)
+      .add(intro)
+//3.4) Add our main panel to the root of our GUI
+ui.root.insert(1,panel)
+
+// Create an inspector panel with a horizontal layout.
+var inspector = ui.Panel({
+  layout: ui.Panel.Layout.flow('horizontal')
+});
+
+// Add a label to the panel.
+inspector.add(ui.Label('Click to get yearly average SDCI'));
+
+
+// Add the panel to the default map.
+Map.add(inspector);
+
+var lon = ui.Label();
+var lat = ui.Label();
+panel.add(ui.Panel([lon, lat], ui.Panel.Layout.flow('horizontal')));
+
+//Create a function to be invoked when the map is clicked
+function clickMap(tci_index) {
+  Map.onClick(function(coords){
+  
+  // Clear the panel and show a loading message.
+  inspector.clear();
+  inspector.style().set('shown', true);
+  inspector.add(ui.Label('Loading...', {color: 'gray'}));
+    
+  //Compute the SDCI value
+    lon.setValue('lon: ' + coords.lon.toFixed(3)),
+    lat.setValue('lat: ' + coords.lat.toFixed(3));
+  var point = ee.Geometry.Point(coords.lon, coords.lat);
+  var reduce = tci_index.reduce(ee.Reducer.first());
+  var sampledPoint = reduce.reduceRegion(ee.Reducer.first(), point, 30);
+  var computedValue = sampledPoint.get('first');  
+
+  // Request the value from the server and use the results in a function.
+  computedValue.evaluate(function(result) {
+  inspector.clear();
+  
+  // Add a label with the results from the server.
+  inspector.add(ui.Label({
+        value: 'SDCI: ' + result.toFixed(2),
+        style: {stretch: 'vertical'}
+      }));
+  
+  // Add a button to hide the Panel.
+      inspector.add(ui.Button({
+        label: 'Close',
+        onClick: function() {
+          inspector.style().set('shown', false);
+        }
+      }));
+    });
+})}
+
+var panel = ui.Panel({
+  style: {
+    position: 'bottom-right',
+    padding: '5px;'
+  }
+})
+
+var title = ui.Label({
+  value: 'Classification',
+  style: {
+    fontSize: '14px',
+    fontWeight: 'bold',
+    margin: '0px;'
+  }
+})
+panel.add(title)
+// panels to hold lon/lat values
+
+var color = ['#a50026','#f46d43', '#ffffbf','#30eb5b', '#387242']
+var lc_class = ['Extreme drought', 'Severe drought', 'Moderate drought','Light drought', 'No drought']
+var list_legend = function(color, description) {
+  
+  var c = ui.Label({
+    style: {
+      backgroundColor: color,
+      padding: '10px',
+      margin: '5px'
+    }
+  })
+  
+  var ds = ui.Label({
+    value: description,
+    style: {
+      margin: '5px'
+    }
+  })
+  
+  return ui.Panel({
+    widgets: [c, ds],
+    layout: ui.Panel.Layout.Flow('horizontal')
+  })
+}
+
+for(var a = 0; a < 5; a++){
+  panel.add(list_legend(color[a], lc_class[a]))
+}
+
+Map.add(panel) 
