@@ -3,10 +3,10 @@
 ///////2. Go to Assets tab on the GEE and import your own shape file and rename it to "country".
 ///////3. To highlight your area of interest, find the code of your country from https://www.fao.org/nocs/en/, clicking on the country and use the GAUL Country Code instead of "117" in line 12. 
 ///////3. To costumize the time, modify the time in line 14 and 15 (start and end dat). Please note thet the format is " YYYY-mm-dd ".
-///////4. Important notice about changing the time: If the interested time is after September 2021, follow the instrcution provided in line 151.
+///////4. Important notice about changing the time: If the interested time is after September 2021, follow the instrcution provided in line 149.
 
 ///// To copy the code, you should copy the link below and paste it in a Browser subscribed to your Earth Engine account.
-////https://code.earthengine.google.com/860791fa32a247b930d18bf7be77c36e
+////  https://code.earthengine.google.com/08e5302844a44627514d52667403b895
 //////Or copy the following lines (from line 12 on) and paste it in your EE acount
 
 var highlight_Shape = highlighted_code.filter(ee.Filter.eq('ADM0_CODE',117));
@@ -55,7 +55,6 @@ Map.setOptions('Satellite')
 //Create a panel to hold our widgets.
 var panel = ui.Panel();
 panel.style().set('width', '500px');
-
 // Create an intro panel with labels.
 var intro = ui.Panel([
   ui.Label({
@@ -132,7 +131,6 @@ var VCI = collectionModNDVI.map(function(image){
   
 });
 
-
 print(VCI,'vci')
   //var vcitimeseries = ui.Chart.image.seriesByRegion(VCI, regions, ee.Reducer.mean(), 'VCI', 1000, 'system:time_start', 'label')
   //.setOptions({
@@ -185,7 +183,6 @@ var PCI = TRMM2.map(function(image){
   return pci.copyProperties(image,['system:time_start','system:time_end'])
   
 });
-
 
 print(PCI,'pci')
   //var vcitimeseries = ui.Chart.image.seriesByRegion(VCI, regions, ee.Reducer.mean(), 'VCI', 1000, 'system:time_start', 'label')
