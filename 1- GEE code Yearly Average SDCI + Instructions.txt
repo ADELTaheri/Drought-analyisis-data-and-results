@@ -3,7 +3,7 @@
 ///////2. Go to Assets tab on the GEE and import your own shape file and rename it to "table".
 
 ///// To copy the code, you should copy the link below and paste it in a Browser subscribed to your Earth Engine account.
-////https://code.earthengine.google.com/a99e74b57f8dccd91df9db7c47978d40
+////https://code.earthengine.google.com/660056339734502bdb5510963392f1be
 //////Or create a GEE blank tab and copy the following lines (From line 9 on) and paste it to that blank GEE file.
 
 // Function to reques the data collection
@@ -22,8 +22,7 @@ function getMap(start_date,end_date, table) {
   // print (lst_modis);
   var min = lst_modis.reduceRegion(ee.Reducer.min(),table,1000).get('LST_Day_1km');
   var max = lst_modis.reduceRegion(ee.Reducer.max(),table,1000).get('LST_Day_1km');
-  
-  var tci_index = lst_modis.expression(
+    var tci_index = lst_modis.expression(
       '(max - lst)/(max - min)',{
         'max': ee.Number(max),
         'min': ee.Number(min),
@@ -42,28 +41,83 @@ function getMap(start_date,end_date, table) {
        
   //VCI
   
-  var ndvi_modis = ee.ImageCollection("MODIS/006/MOD13Q1")
-  .filterBounds(table)
-  .filterDate(start_date,end_date)
-  .select('NDVI')
-  .mean()
-  .multiply(0.0001)
-  .clip(table);
+  //var ndvi_modis = ee.ImageCollection("MODIS/006/MOD13Q1")
+  //.filterBounds(table)
+ // .filterDate(start_date,end_date)
+ // .select('NDVI')
+ // .mean()
+ // .multiply(0.0001)
+ // .clip(table);
   
     
-    var min = ndvi_modis.reduceRegion(ee.Reducer.min(),table,1000).get('NDVI');
-    var max = ndvi_modis.reduceRegion(ee.Reducer.max(),table,1000).get('NDVI');
+  //  var min = ndvi_modis.reduceRegion(ee.Reducer.min(),table,1000).get('NDVI');
+  //  var max = ndvi_modis.reduceRegion(ee.Reducer.max(),table,1000).get('NDVI');
     
-    var vci_index = ndvi_modis.expression(
-      '(ndvi - min)/(max - min)',{
-        'min':ee.Number(min),
-        'max':ee.Number(max),
-        'ndvi': ndvi_modis
-      }).rename('VCI');
+  //  var vci_index = ndvi_modis.expression(
+  //    '(ndvi - min)/(max - min)',{
+  //      'min':ee.Number(min),
+   //     'max':ee.Number(max),
+    //    'ndvi': ndvi_modis
+    //  }).rename('VCI');
+    
+    
+         ///////vci////
+///// Calling landcover map///
+
+
+var dataset = ee.ImageCollection('MODIS/061/MCD12Q1')
+.filterBounds(table)
+.filterDate(start_date,end_date)
+.select('LC_Type1')
+.mean()
+.multiply(1)
+.clip(table);
+var LandCoverVis = {
+  min: 1.0,
+  max: 17.0,
+  palette: [
+    '05450a', '086a10', '54a708', '78d203', '009900', 'c6b044', 'dcd159',
+    'dade48', 'fbff13', 'b6ff05', '27ff87', 'c24f44', 'a5a5a5', 'ff6d4c',
+    '69fff8', 'f9ffa4', '1c0dff'
+  ],
+};
+
+////// process of masking water from landcover map////
+
+
+//Map.style().set('cursor', 'crosshair');
+//Map.addLayer(dataset, LandCoverVis, 'IGBP Land Cover');
+var landmask = dataset.select('LC_Type1').lt(17);
+//print ('landmask',landmask);
+//Map.addLayer(landmask, {palette : ['blue', 'lightgreen']},'landmask') 
+var landMaskMasked = landmask.selfMask();
+//print ('landmask,masked',landMaskMasked);
+//Map.addLayer(landMaskMasked, {palette : ['gold']},'landmask,masked') 
+/////////////////
+/// obtaining NDVI/////
+var ndvi_modis = ee.ImageCollection("MODIS/006/MOD13Q1")
+.filterBounds(table)
+.filterDate (start_date,end_date)
+.select('NDVI')
+.mean()
+.multiply(0.0001)
+.clip(table);
+/// masking NDVI ////
+var ndvi_masked = ndvi_modis.multiply(landMaskMasked);
+//Map.addLayer(ndvi_masked,{},'ndvii_masked');
+  var min = ndvi_masked.reduceRegion(ee.Reducer.min(),table,1000).get('NDVI');
+  var max = ndvi_masked.reduceRegion(ee.Reducer.max(),table,1000).get('NDVI');
+  ///// calculation of VCI over maked NDVI /// 
+  var vci_masked = ndvi_masked.expression(
+    '(ndvi - min)/(max - min)',{
+      'min':ee.Number(min),
+      'max':ee.Number(max),
+      'ndvi': ndvi_masked
+    }).rename('VCI_masked');
+
   
   //PCI
-  
-  var TRMM2 =  ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY") 
+var TRMM2 =  ee.ImageCollection("UCSB-CHG/CHIRPS/DAILY") 
   .filterBounds(table)
   .filterDate(start_date,end_date)
   .select('precipitation')
@@ -81,12 +135,12 @@ function getMap(start_date,end_date, table) {
   
   // SDCI////////////////////
   
-  var dataset = ee.Image.cat(tci_index,vci_index,pci);
+  var dataset = ee.Image.cat(tci_index,vci_masked,pci);
   //print(dataset,'dataset');
   
-  var SDCI = dataset.expression('0.5 * pci + 0.25 * vci_index + 0.25 * tci_index',{
+  var SDCI = dataset.expression('0.5 * pci + 0.25 * vci_masked + 0.25 * tci_index',{
     'pci':dataset.select('PCI'),
-    'vci_index':dataset.select('VCI'),
+    'vci_masked':dataset.select('VCI_masked'),
     'tci_index':dataset.select('TCI'),
   });
   
@@ -263,7 +317,6 @@ checkBox_3.onChange(
     }
   })
 )
-
 checkBox_4.onChange(
   (function(checked) {
       if (checked) {
@@ -354,21 +407,6 @@ checkBox_9.onChange(
     }
   })
 )
-checkBox_9.onChange(
-  (function(checked) {
-      if (checked) {
-        if (Map.layers().length()>0){
-          var layers = Map.layers()
-          Map.remove(layers.get(0))
-        }
-        var start_date = dict_dates[checkBox_9.getLabel()]['start_date']
-        var end_date = dict_dates[checkBox_9.getLabel()]['end_date']
-        isChecked(checkBox_9.getLabel(), dict_dates)
-        var sdci_index = getMap(start_date, end_date,table)
-        clickMap(sdci_index)
-    }
-  })
-)
 checkBox_10.onChange(
   (function(checked) {
       if (checked) {
@@ -429,7 +467,6 @@ checkBox_13.onChange(
     }
   })
 )
-
 
 /////Adding panels
 var header = ui.Label('Scaled Drought Condition Index (SDCI)', {fontSize: '15px', fontWeight: 'bold', color: '4A997E'});
@@ -543,8 +580,7 @@ function clickMap(tci_index) {
   // Request the value from the server and use the results in a function.
   computedValue.evaluate(function(result) {
   inspector.clear();
-  
-  // Add a label with the results from the server.
+   // Add a label with the results from the server.
   inspector.add(ui.Label({
         value: 'SDCI: ' + result.toFixed(2),
         style: {stretch: 'vertical'}
@@ -607,4 +643,4 @@ for(var a = 0; a < 5; a++){
   panel.add(list_legend(color[a], lc_class[a]))
 }
 
-Map.add(panel) 
+Map.add(panel)
