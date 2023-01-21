@@ -6,4 +6,4 @@
 
 2. The code for drought indices time series:
 
-   https://adeltaheripolimi.users.earthengine.app/view/temporalanalysisof-drought
+   https://adeltaheripolimi.users.earthengine.app/view/temporaldroughtindices
